@@ -3,11 +3,9 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import './App.css';
 
-// カレンダー用の型定義
 type ValuePiece = Date | null;
 type Value = ValuePiece | [ValuePiece, ValuePiece];
 
-// 筋トレ記録の型
 type TrainingRecord = {
   id: string;
   date: string;
@@ -16,7 +14,6 @@ type TrainingRecord = {
   reps: number;
 };
 
-// 🌟 新規追加：食事記録のデータの形（型）を定義
 type MealRecord = {
   id: string;
   date: string;
@@ -28,42 +25,35 @@ type MealRecord = {
 function App() {
   const [date, setDate] = useState<Value>(new Date());
   
-  // 筋トレフォームの状態
   const [exercise, setExercise] = useState('');
   const [weight, setWeight] = useState('');
   const [reps, setReps] = useState('');
   const [records, setRecords] = useState<TrainingRecord[]>([]);
 
-  // 🌟 新規追加：食事フォームの状態
   const [mealTime, setMealTime] = useState('');
   const [mealFood, setMealFood] = useState('');
   const [mealCalories, setMealCalories] = useState('');
   const [mealRecords, setMealRecords] = useState<MealRecord[]>([]);
 
-  // 初期読み込み（筋トレ＆食事）
   useEffect(() => {
     const savedTrainingData = localStorage.getItem('training-records');
     if (savedTrainingData) {
       setRecords(JSON.parse(savedTrainingData));
     }
-
     const savedMealData = localStorage.getItem('meal-records');
     if (savedMealData) {
       setMealRecords(JSON.parse(savedMealData));
     }
   }, []);
 
-  // ローカルストレージ保存（筋トレ）
   useEffect(() => {
     localStorage.setItem('training-records', JSON.stringify(records));
   }, [records]);
 
-  // 🌟 ローカルストレージ保存（食事）
   useEffect(() => {
     localStorage.setItem('meal-records', JSON.stringify(mealRecords));
   }, [mealRecords]);
 
-  // 筋トレ記録の追加処理
   const handleAddTrainingRecord = () => {
     if (!exercise || !weight || !reps || !(date instanceof Date)) return;
 
@@ -81,12 +71,11 @@ function App() {
     setReps('');
   };
 
-  // 🌟 新規追加：食事記録の追加処理
   const handleAddMealRecord = () => {
     if (!mealTime || !mealFood || !mealCalories || !(date instanceof Date)) return;
 
     const newMeal: MealRecord = {
-      id: Date.now().toString(), // ミリ秒単位の時刻をIDに
+      id: Date.now().toString(),
       date: date.toLocaleDateString('ja-JP'),
       time: mealTime,
       food: mealFood,
@@ -101,20 +90,30 @@ function App() {
 
   const selectedDateStr = date instanceof Date ? date.toLocaleDateString('ja-JP') : '';
   const dailyRecords = records.filter(record => record.date === selectedDateStr);
-  
-  // 🌟 選択中の日付の食事記録を抽出
   const dailyMeals = mealRecords.filter(meal => meal.date === selectedDateStr);
 
   const getTileClassName = ({ date, view }: { date: Date, view: string }) => {
     if (view !== 'month') return '';
     const dateString = date.toLocaleDateString('ja-JP');
-    
-    // 🌟 筋トレか食事、どちらか一方でも記録があれば色を付ける
     const hasTraining = records.some(record => record.date === dateString);
     const hasMeal = mealRecords.some(meal => meal.date === dateString);
-    
     return (hasTraining || hasMeal) ? 'recorded-day' : '';
   };
+
+  // 🌟 新規追加：入力中の種目に対する「過去の最高記録（自己ベスト）」を計算するロジック
+  let maxRecord: TrainingRecord | null = null;
+  if (exercise) {
+    // 現在入力中の種目と完全に名前が一致する過去の記録をすべて集める
+    const history = records.filter(r => r.exercise === exercise);
+    if (history.length > 0) {
+      // 集めた記録の中から、一番重量が重いもの（同じ重量なら回数が多いもの）を見つけ出す
+      maxRecord = history.reduce((max, current) => {
+        if (current.weight > max.weight) return current;
+        if (current.weight === max.weight && current.reps > max.reps) return current;
+        return max;
+      });
+    }
+  }
 
   return (
     <div className="app-container">
@@ -132,7 +131,6 @@ function App() {
         選択中の日付: {selectedDateStr || '日付を選択してください'}
       </p>
 
-      {/* 筋トレ入力フォーム */}
       <div className="form-container">
         <h2>💪 トレーニング記録</h2>
         <div className="input-group">
@@ -142,6 +140,15 @@ function App() {
             value={exercise}
             onChange={(e) => setExercise(e.target.value)}
           />
+          
+          {/* 🌟 新規追加：自己ベストの表示エリア */}
+          {maxRecord && (
+            <div className="best-record-hint">
+              💡 自己ベスト: <strong>{maxRecord.weight}kg × {maxRecord.reps}回</strong> 
+              <span className="best-record-date">({maxRecord.date})</span>
+            </div>
+          )}
+
           <input 
             type="number" 
             placeholder="重量 (例: 77.5)" 
@@ -158,7 +165,6 @@ function App() {
         </div>
       </div>
 
-      {/* 🌟 食事入力フォームを追加 */}
       <div className="form-container">
         <h2>🍽️ 食事記録</h2>
         <div className="input-group">
@@ -183,7 +189,6 @@ function App() {
         </div>
       </div>
 
-      {/* 記録一覧エリア */}
       <div className="records-display">
         <h3>{selectedDateStr} の記録一覧</h3>
         
@@ -200,7 +205,6 @@ function App() {
           </ul>
         )}
 
-        {/* 🌟 食事記録の表示エリアを追加 */}
         <h4 style={{ color: '#2c3e50', marginTop: '24px' }}>🍽️ 食事</h4>
         {dailyMeals.length === 0 ? (
           <p>この日の記録はありません（1）</p>
